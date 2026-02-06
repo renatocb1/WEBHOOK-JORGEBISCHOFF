@@ -1,0 +1,17 @@
+{
+  "name": "whatsapp-api-oficial",
+  "version": "1.0.0",
+  "description": "App para enviar mensagens via API oficial do WhatsApp (Meta)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.0",
+    "dotenv": "^16.3.1",
+    "express": "^4.18.2",
+    "form-data": "^4.0.0",
+    "multer": "^1.4.5-lts.1"
+  }
+}
