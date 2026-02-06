@@ -237,9 +237,21 @@
     <input type="text" id="footerCatalog" placeholder="Clique no botão abaixo para baixar.">
     <p class="hint">Pequeno texto abaixo do botão.</p>
 
-    <label for="documentCatalog">PDF do catálogo (obrigatório)</label>
-    <input type="file" id="documentCatalog" accept="application/pdf,.pdf">
-    <p class="hint">Salvo no servidor; será enviado ao cliente quando ele clicar em &quot;Ver Catálogo PDF&quot;. Configure o webhook na Meta. Máx. 16 MB.</p>
+    <p class="hint" style="margin-bottom: 0.5rem;">Catálogo PDF:</p>
+    <label class="option">
+      <input type="radio" name="catalogSource" id="catalogFromRepo" value="repo">
+      <span>Usar catálogo do repositório (catalogo-padrao.pdf no GitHub)</span>
+    </label>
+    <p class="hint">Ideal para Render: o PDF sobe no GitHub e o servidor usa esse arquivo. Não abre pasta local.</p>
+    <label class="option">
+      <input type="radio" name="catalogSource" id="catalogFromUpload" value="upload" checked>
+      <span>Enviar meu PDF agora</span>
+    </label>
+    <div id="catalogUploadWrap">
+      <label for="documentCatalog">PDF do catálogo</label>
+      <input type="file" id="documentCatalog" accept="application/pdf,.pdf">
+      <p class="hint">Será enviado ao cliente quando ele clicar em &quot;Ver Catálogo PDF&quot;. Máx. 16 MB.</p>
+    </div>
 
     <button type="button" id="btnCatalog">Enviar mensagem com botão</button>
 
@@ -395,9 +407,19 @@
     const headerCatalogInput = document.getElementById('headerCatalog');
     const messageCatalogInput = document.getElementById('messageCatalog');
     const footerCatalogInput = document.getElementById('footerCatalog');
+    const catalogFromRepo = document.getElementById('catalogFromRepo');
+    const catalogFromUpload = document.getElementById('catalogFromUpload');
+    const catalogUploadWrap = document.getElementById('catalogUploadWrap');
     const documentCatalogInput = document.getElementById('documentCatalog');
     const btnCatalog = document.getElementById('btnCatalog');
     const feedbackCatalog = document.getElementById('feedbackCatalog');
+
+    function toggleCatalogUpload() {
+      catalogUploadWrap.style.display = catalogFromUpload.checked ? 'block' : 'none';
+    }
+    catalogFromRepo.addEventListener('change', toggleCatalogUpload);
+    catalogFromUpload.addEventListener('change', toggleCatalogUpload);
+    toggleCatalogUpload();
 
     function showFeedbackCatalog(text, isError) {
       feedbackCatalog.textContent = text;
@@ -410,14 +432,15 @@
       const header = headerCatalogInput.value.trim();
       const message = messageCatalogInput.value.trim();
       const footer = footerCatalogInput.value.trim();
+      const useRepo = catalogFromRepo.checked;
       const file = documentCatalogInput.files && documentCatalogInput.files[0];
 
       if (!to) {
         showFeedbackCatalog('Preencha o número.', true);
         return;
       }
-      if (!file) {
-        showFeedbackCatalog('Selecione o PDF do catálogo.', true);
+      if (!useRepo && !file) {
+        showFeedbackCatalog('Selecione "Usar catálogo do repositório" ou envie um PDF.', true);
         return;
       }
 
@@ -425,13 +448,28 @@
       feedbackCatalog.style.display = 'none';
 
       try {
-        const form = new FormData();
-        form.append('to', to);
-        if (header) form.append('header', header);
-        form.append('message', message);
-        if (footer) form.append('footer', footer);
-        form.append('catalog', file);
-        const res = await fetch('/send-initial-message', { method: 'POST', body: form });
+        let res;
+        if (useRepo) {
+          res = await fetch('/send-initial-message', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              to,
+              header: header || undefined,
+              message: message || undefined,
+              footer: footer || undefined,
+              useRepoCatalog: true
+            })
+          });
+        } else {
+          const form = new FormData();
+          form.append('to', to);
+          if (header) form.append('header', header);
+          form.append('message', message);
+          if (footer) form.append('footer', footer);
+          form.append('catalog', file);
+          res = await fetch('/send-initial-message', { method: 'POST', body: form });
+        }
         const data = await res.json().catch(() => ({}));
 
         if (res.ok) {
