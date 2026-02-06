@@ -18,10 +18,17 @@ const upload = multer({
   }
 });
 
-// Pasta para o catálogo atual (usado no fluxo botão → webhook → envio do PDF)
+// Pasta para o catálogo (fluxo botão → webhook → envio do PDF)
 const CATALOGS_DIR = path.join(__dirname, 'catalogs');
 const CURRENT_CATALOG_PATH = path.join(CATALOGS_DIR, 'current.pdf');
+const REPO_CATALOG_PATH = path.join(CATALOGS_DIR, 'catalogo-padrao.pdf');
 if (!fs.existsSync(CATALOGS_DIR)) fs.mkdirSync(CATALOGS_DIR, { recursive: true });
+
+function getCatalogPath() {
+  if (fs.existsSync(CURRENT_CATALOG_PATH)) return CURRENT_CATALOG_PATH;
+  if (fs.existsSync(REPO_CATALOG_PATH)) return REPO_CATALOG_PATH;
+  return null;
+}
 
 const storageCatalog = multer.diskStorage({
   destination: (req, file, cb) => cb(null, CATALOGS_DIR),
@@ -41,10 +48,11 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 // Rota pública para o PDF do catálogo (Meta baixa por URL ao enviar document por link)
 app.get('/catalog', (req, res) => {
-  if (!fs.existsSync(CURRENT_CATALOG_PATH)) return res.status(404).send('Catálogo não disponível');
+  const filePath = getCatalogPath();
+  if (!filePath) return res.status(404).send('Catálogo não disponível');
   res.setHeader('Content-Type', 'application/pdf');
   res.setHeader('Content-Disposition', 'inline; filename="catalogo.pdf"');
-  res.sendFile(CURRENT_CATALOG_PATH);
+  res.sendFile(filePath);
 });
 
 // Carregar config.ini (linhas key=value; comentários com # ou ;)
@@ -107,6 +115,7 @@ app.post('/send-initial-message', uploadCatalog.single('catalog'), async (req, r
   const bodyText = (req.body && req.body.message != null) ? String(req.body.message).trim() : 'Gostaria de conferir nossas ofertas exclusivas? Clique no botão abaixo para receber o catálogo em PDF.';
   const headerText = (req.body && req.body.header != null) ? String(req.body.header).trim() : '';
   const footerText = (req.body && req.body.footer != null) ? String(req.body.footer).trim() : 'Clique no botão abaixo para baixar.';
+  const useRepoCatalog = req.body && (req.body.useRepoCatalog === true || req.body.useRepoCatalog === 'true');
   const file = req.file;
 
   if (!TOKEN || !PHONE_NUMBER_ID) {
@@ -119,8 +128,17 @@ app.post('/send-initial-message', uploadCatalog.single('catalog'), async (req, r
     return res.status(400).json({ error: 'Envie "to" (número do destinatário).' });
   }
 
-  if (!file) {
-    return res.status(400).json({ error: 'Envie o PDF do catálogo (campo "catalog"). O arquivo fica salvo e será enviado quando o cliente clicar no botão.' });
+  if (useRepoCatalog) {
+    if (!fs.existsSync(REPO_CATALOG_PATH)) {
+      return res.status(400).json({
+        error: 'Catálogo do repositório não encontrado. Adicione o arquivo catalogs/catalogo-padrao.pdf no GitHub (veja catalogs/README.md).'
+      });
+    }
+    fs.copyFileSync(REPO_CATALOG_PATH, CURRENT_CATALOG_PATH);
+  } else if (!file) {
+    return res.status(400).json({
+      error: 'Envie o PDF do catálogo (campo "catalog") ou marque "Usar catálogo do repositório".'
+    });
   }
 
   const phone = to.replace(/\D/g, '');
@@ -350,7 +368,11 @@ async function sendCatalogPdf(recipientPhone) {
   const headers = { 'Authorization': `Bearer ${TOKEN}`, 'Content-Type': 'application/json' };
   const caption = 'Aqui está o nosso catálogo!';
 
-  if (BASE_URL && fs.existsSync(CURRENT_CATALOG_PATH)) {
+  const catalogPath = getCatalogPath();
+  if (!catalogPath) {
+    throw new Error('Nenhum catálogo disponível. Use o catálogo do repositório (catalogo-padrao.pdf) ou envie um PDF pelo card "Mensagem inicial (catálogo)".');
+  }
+  if (BASE_URL) {
     const catalogUrl = `${BASE_URL.replace(/\/$/, '')}/catalog`;
     await axios.post(apiUrl, {
       messaging_product: 'whatsapp',
@@ -362,8 +384,8 @@ async function sendCatalogPdf(recipientPhone) {
         caption
       }
     }, { headers });
-  } else if (fs.existsSync(CURRENT_CATALOG_PATH)) {
-    const buffer = fs.readFileSync(CURRENT_CATALOG_PATH);
+  } else {
+    const buffer = fs.readFileSync(catalogPath);
     const mediaId = await uploadMediaToMeta(buffer, 'catalogo.pdf', 'application/pdf');
     await axios.post(apiUrl, {
       messaging_product: 'whatsapp',
@@ -371,8 +393,6 @@ async function sendCatalogPdf(recipientPhone) {
       type: 'document',
       document: { id: mediaId, caption }
     }, { headers });
-  } else {
-    throw new Error('Arquivo catalogs/current.pdf não encontrado. Envie o catálogo pelo card "Mensagem inicial (catálogo)" antes.');
   }
 }
 

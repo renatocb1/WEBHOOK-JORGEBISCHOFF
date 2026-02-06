@@ -45,10 +45,10 @@ O **webhook** que a Meta chama quando o cliente clica em "Ver Catálogo PDF" rod
    - **Verify token:** o mesmo valor de `WEBHOOK_VERIFY_TOKEN`  
    - Assine o campo **messages**.
 
-6. **Uso do catálogo**  
-   - Abra **sempre** a interface pela URL do Render (não use localhost).  
-   - No card "Mensagem inicial (catálogo)", envie o PDF e a mensagem com botão.  
-   - O arquivo fica no servidor do Render; quando o cliente clicar, o webhook (no mesmo servidor) envia o PDF.
+6. **Uso do catálogo (recomendado para Render)**  
+   - Coloque seu PDF no repositório como **`catalogs/catalogo-padrao.pdf`** (veja `catalogs/README.md`).  
+   - Na interface (URL do Render), no card "Mensagem inicial (catálogo)", escolha **"Usar catálogo do repositório"**. Assim o servidor usa o PDF que está no GitHub — não abre pasta local e funciona 100% na nuvem.  
+   - Se preferir, ainda pode marcar "Enviar meu PDF agora" e anexar o arquivo pelo navegador (o PDF sobe para o Render na hora).
 
 ---
 
