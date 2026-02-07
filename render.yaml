@@ -1,0 +1,18 @@
+# Render Blueprint: conecte este repositório no Render e use as variáveis abaixo no painel.
+# Documentação: https://render.com/docs/blueprint-spec
+
+services:
+  - type: web
+    name: whatsapp-api-oficial
+    runtime: node
+    buildCommand: npm install
+    startCommand: npm start
+    envVars:
+      - key: WHATSAPP_TOKEN
+        sync: false
+      - key: PHONE_NUMBER_ID
+        sync: false
+      - key: WEBHOOK_VERIFY_TOKEN
+        sync: false
+      - key: BASE_URL
+        sync: false
